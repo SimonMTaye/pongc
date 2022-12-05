@@ -8,9 +8,10 @@
 #include <pthread.h>
 
 #define X_DIMEN 32
-#define Y_DIMEN 8 
+#define Y_DIMEN 10
 #define PADDLE_HEIGHT 2 
-#define DEBUG_LINE 5
+#define DEBUG_LINE_START 5
+#define DEBUG_LINE_END 10
 
 #endif
 

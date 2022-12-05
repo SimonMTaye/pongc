@@ -4,3 +4,5 @@
 - [ ] Make program not scale aware. In other, define fixed ways of drawing stuff and have them do scaling. Do not include scaling logic to other components of the game
 ## Others
 - Include more debuging lines and print them on scaling, end and stuff
+- DO NOT USE MACRO RETURN VALUES
+- Isolate funky coordinate maths to as little functions and reuse instead. Very buggy
