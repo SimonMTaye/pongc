@@ -6,3 +6,4 @@
 - Include more debuging lines and print them on scaling, end and stuff
 - DO NOT USE MACRO RETURN VALUES
 - Isolate funky coordinate maths to as little functions and reuse instead. Very buggy
+- If scaling is hidden from most functions, remove configurability in favor of fixed ways of moving

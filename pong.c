@@ -15,8 +15,8 @@ void draw_area(int starty, int startx, int endy, int endx, chtype ch);
 
 #define draw_paddle_left(Y) (draw_paddle((Y), 0))
 #define draw_paddle_right(Y) (draw_paddle((Y), (end.x - scale)))
-#define move_paddle_left(Y, C) (move_paddle((Y), 0, (C)))
-#define move_paddle_right(Y, C) (move_paddle((Y), (end.x - scale), (C)))
+#define move_paddle_left(C) (move_paddle(left_paddle, 0, (C)))
+#define move_paddle_right(C) (move_paddle(right_paddle, (end.x - scale), (C)))
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
 #define min(X,Y) ((X) < (Y) ? (X) : (Y))
 
@@ -55,22 +55,18 @@ int main(void) {
         v = getch();
         switch (v) {
             case KEY_UP:
-                move_paddle_right((right_paddle), (-scale));
-                right_paddle -= scale;
+                right_paddle = move_paddle_right(-scale);
                 break;
             case KEY_DOWN:
-                move_paddle_right((right_paddle), (scale));
-                right_paddle += scale;
+                right_paddle = move_paddle_right(scale);
                 break;
             case 'W':
             case 'w':
-                move_paddle_left((left_paddle), (-scale));
-                left_paddle -= scale; 
+                left_paddle = move_paddle_left(-scale);
                 break;
             case 'S':
             case 's':
-                move_paddle_left((left_paddle), (scale));
-                left_paddle += scale; 
+                left_paddle = move_paddle_left(scale);
                 break;               
         }
     } while (v != (int) 'q');
@@ -116,12 +112,14 @@ void erase_paddle(int starty, int startx) {
 }
 
 int draw_paddle(int starty, int startx) {
-    int begin_y = min(max(0, starty), end.y - (scale * PADDLE_HEIGHT));
+    int begin_y = ((starty) > (0) ? (starty) : (0));
+    begin_y = ((begin_y) <= (paddle_last) ? (begin_y) : (paddle_last));
+    int end_y = begin_y + (scale * PADDLE_HEIGHT);
     move(end.y + DEBUG_LINE_END, 0);
     char buffer[50];
-    sprintf(buffer, "DRAWING PADDLE ID: %d TO %d. VALUE RECIEVED WAS: %d     ", startx,  begin_y, starty);
+    sprintf(buffer, "DRAWING PADDLE ID: %d TO (%d,%d). VALUE RECIEVED WAS: %d     ", startx,  begin_y, end_y, starty);
     printw(buffer);
-    draw_area(starty, startx, starty + (scale * PADDLE_HEIGHT), startx + scale, ACS_BLOCK);
+    draw_area(begin_y, startx, end_y, startx + scale, ACS_BLOCK);
     return begin_y;
 }
 
@@ -129,18 +127,15 @@ int draw_paddle(int starty, int startx) {
 int move_paddle(int starty, int startx, int y_offset) {
     // For each 'row', delete scale amount of chars
     erase_paddle(starty, startx);
+    int new_pos = draw_paddle(starty+y_offset , startx);
     move(end.y + DEBUG_LINE_END - 1, 0);
     char buffer[50];
-    sprintf(buffer, "MOVING PADDLE ID: %d FROM %d WITH OFFSET %d         ", startx,  starty, y_offset);
+    sprintf(buffer, "MOVING PADDLE ID: %d FROM %d WITH OFFSET %d. RETURNED: %d         ", startx,  starty, y_offset, new_pos);
     printw(buffer);
-    return draw_paddle(starty+y_offset , startx);
+    return new_pos;
 }
 
 void draw_area(int starty, int startx, int endy, int endx, chtype ch) {
-    starty = max(starty, 0);
-    startx = max(startx, 0);
-    endy = min(endy, LINES);
-    endx = min(endx, COLS);
     move(end.y + DEBUG_LINE_END-2, 0);
     char buffer[50];
     sprintf(buffer, "DRAWING BOX (START, END), Y: (%d, %d), X: (%d, %d)", starty,  endy, startx, endx);
