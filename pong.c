@@ -13,12 +13,11 @@ void safe_error_exit(int status, char* message);
 void* ballcontrol(void* args);
 void draw_area(int starty, int startx, int endy, int endx, chtype ch);
 
-#define draw_paddle_left(Y) (draw_paddle((Y), 0))
-#define draw_paddle_right(Y) (draw_paddle((Y), (end.x - scale)))
-#define move_paddle_left(Y, C) (move_paddle((Y), 0, (C)))
-#define move_paddle_right(Y, C) (move_paddle((Y), (end.x - scale), (C)))
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
 #define min(X,Y) ((X) < (Y) ? (X) : (Y))
+
+#define PADDLE_LEFT_X (0)
+#define PADDLE_RIGHT_X (end.x - scale)
 
 int scale;
 int paddle_last;
@@ -46,31 +45,28 @@ int main(void) {
     ball_position.y = end.y / 2;
     int right_paddle = 4;
     int left_paddle = 4;
-    draw_paddle_left(4);
-    draw_paddle_right(4);
+    right_paddle = draw_paddle(right_paddle, PADDLE_RIGHT_X);
+    left_paddle = draw_paddle(left_paddle, PADDLE_LEFT_X);
     int v;
-    //pthread_t ball_thread;
-    //pthread_create(&ball_thread, NULL, ballcontrol, NULL);
+    pthread_t ball_thread;
+    pthread_create(&ball_thread, NULL, ballcontrol, NULL);
     do {
+        refresh();
         v = getch();
         switch (v) {
             case KEY_UP:
-                move_paddle_right((right_paddle), (-scale));
-                right_paddle -= scale;
+                right_paddle = move_paddle(right_paddle, PADDLE_RIGHT_X, (0 - scale));
                 break;
             case KEY_DOWN:
-                move_paddle_right((right_paddle), (scale));
-                right_paddle += scale;
+                right_paddle = move_paddle(right_paddle, PADDLE_RIGHT_X, scale);
                 break;
             case 'W':
             case 'w':
-                move_paddle_left((left_paddle), (-scale));
-                left_paddle -= scale; 
+                left_paddle = move_paddle(left_paddle, PADDLE_LEFT_X, (0 -scale));
                 break;
             case 'S':
             case 's':
-                move_paddle_left((left_paddle), (scale));
-                left_paddle += scale; 
+                left_paddle = move_paddle(left_paddle, PADDLE_LEFT_X, scale);
                 break;               
         }
     } while (v != (int) 'q');
@@ -97,7 +93,7 @@ void init_curses() {
     end.y = scale * Y_DIMEN;
     paddle_last = end.y - (scale * PADDLE_HEIGHT);
     move(end.y + DEBUG_LINE_START, 0);
-    char buffer[50];
+    char buffer[100];
     sprintf(buffer, "SCALE: %d\t END.Y: %d\t END.X: %d\t PADDLE LAST: %d        ", scale, end.y, end.x, paddle_last);
     printw(buffer);
 }
@@ -118,10 +114,10 @@ void erase_paddle(int starty, int startx) {
 int draw_paddle(int starty, int startx) {
     int begin_y = min(max(0, starty), end.y - (scale * PADDLE_HEIGHT));
     move(end.y + DEBUG_LINE_END, 0);
-    char buffer[50];
+    char buffer[100];
     sprintf(buffer, "DRAWING PADDLE ID: %d TO %d. VALUE RECIEVED WAS: %d     ", startx,  begin_y, starty);
     printw(buffer);
-    draw_area(starty, startx, starty + (scale * PADDLE_HEIGHT), startx + scale, ACS_BLOCK);
+    draw_area(begin_y, startx, begin_y + (scale * PADDLE_HEIGHT), startx + scale, ACS_BLOCK);
     return begin_y;
 }
 
@@ -130,10 +126,12 @@ int move_paddle(int starty, int startx, int y_offset) {
     // For each 'row', delete scale amount of chars
     erase_paddle(starty, startx);
     move(end.y + DEBUG_LINE_END - 1, 0);
-    char buffer[50];
+    char buffer[100];
     sprintf(buffer, "MOVING PADDLE ID: %d FROM %d WITH OFFSET %d         ", startx,  starty, y_offset);
     printw(buffer);
-    return draw_paddle(starty+y_offset , startx);
+    int new_y = starty+y_offset;
+    new_y = draw_paddle(new_y, startx);
+    return new_y;
 }
 
 void draw_area(int starty, int startx, int endy, int endx, chtype ch) {
@@ -142,7 +140,7 @@ void draw_area(int starty, int startx, int endy, int endx, chtype ch) {
     endy = min(endy, LINES);
     endx = min(endx, COLS);
     move(end.y + DEBUG_LINE_END-2, 0);
-    char buffer[50];
+    char buffer[100];
     sprintf(buffer, "DRAWING BOX (START, END), Y: (%d, %d), X: (%d, %d)", starty,  endy, startx, endx);
     printw(buffer);
     for (int i = starty; i < endy; i++) {
@@ -161,21 +159,44 @@ void safe_error_exit(int status, char* message) {
 }
 
 void draw_ball(int y, int x) {
-    draw_area(y, x, y+scale, x+scale, ACS_BULLET);
+    draw_area(y, x, y+scale, x+scale, ACS_BLOCK);
 }
 
 void erase_ball(int y, int x) {
     draw_area(y, x, y+scale, x+scale, ' ');
 }
 
+// do boundary checking on the ball and modify its 
+void bounce() {
+    // Bounce on top or bottom wall:
+    if ((ball_position.y < 0) || (ball_position.y > (end.y - scale))) {
+        // reflect y speed, stick y position to be one unit back
+        ball_speed.y = 0 - ball_speed.y;
+        // current pos + (-) 2 units of movement
+        ball_position.y = ball_position.y + (scale * 2 * ball_speed.y);
+    } else if (ball_position.x < 0 || ball_position.x > (end.x - scale) ){
+        // reflect y speed, stick y position to be one unit back
+        ball_speed.x = 0 - ball_speed.x;
+        // current pos + (-) 2 units of movement
+        ball_position.x = ball_position.x + (scale * 2 * ball_speed.x);
+
+    }
+    // TODO Implement bounce on paddle
+    // TODO Implement scoring when bounce on left/right wall
+}
+
 
 void* ballcontrol(void* args) {
+    draw_ball(ball_position.y, ball_position.x);
+    slk_noutrefresh();
     while(true) {
-        draw_ball(ball_position.y, ball_position.x);
-        usleep(1000);
+        usleep(500000);
         erase_ball(ball_position.y, ball_position.x);
         ball_position.y += (ball_speed.y * scale);
         ball_position.x += (ball_speed.x * scale);
+        bounce();
+        draw_ball(ball_position.y, ball_position.x);
+        slk_noutrefresh();
     }
     return NULL;
 }
