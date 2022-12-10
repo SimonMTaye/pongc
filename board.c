@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -14,6 +15,7 @@ typedef struct vector {
 
 void draw_area(int starty, int startx, int endy, int endx, chtype ch);
 void reset_game();
+void debug(char* message);
 
 // Min-Max macros
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
@@ -85,7 +87,7 @@ void init_game_constants() {
 
     // Initialize ball constants
     ball_speed.y = 1;
-    ball_speed.x = 1;
+    ball_speed.x = 4;
     ball_position.y = Y_DIMEN / 2;
     ball_position.x = X_DIMEN / 2;
     
@@ -106,7 +108,7 @@ void right_paddle_up() {
 
 void right_paddle_down(){
     erase_right_paddle();
-    right_paddle.y = min(right_paddle.y + 1, Y_DIMEN - PADDLE_HEIGHT);
+    right_paddle.y = min(right_paddle.y + 1, (Y_DIMEN - 1) - PADDLE_HEIGHT);
     draw_right_paddle();
 }
 
@@ -118,36 +120,51 @@ void left_paddle_up() {
 
 void left_paddle_down(){
     erase_left_paddle();
-    left_paddle.y = min(left_paddle.y + 1, Y_DIMEN - PADDLE_HEIGHT);
+    left_paddle.y = min(left_paddle.y + 1, (Y_DIMEN - 1) - PADDLE_HEIGHT);
     draw_left_paddle();
 }
 
+void debug(char * message) {
+    // Use low-level draw since score is off the game board
+    draw_area((NS_OFFSET.y / 2) +1, NS_OFFSET.x, (NS_OFFSET.y /2) + 2, NS_OFFSET.x + X_DIMEN, ' ');
+    move((NS_OFFSET.y / 2) + 1, (COLS / 2) - (X_DIMEN/2));
+    printw(message);
+
+}
+
+// TODO: Bounces of paddle bottom in a way it shouldn't
 void move_ball() {
+    erase_ball();
+    ball_position.y += ball_speed.y;
+    ball_position.x += ball_speed.x;
+    // Bounce on left paddle
+    if ((ball_position.x) <= (left_paddle.x + PADDLE_LENGTH) &&  ((ball_position.y + BALL_HEIGHT - 1) >= left_paddle.y) && (ball_position.y <= (left_paddle.y + PADDLE_HEIGHT))) {
+        ball_speed.x = ball_speed.x * -1;
+        // In case the ball is about to fly off the board bounds, make it stick to the paddle
+        ball_position.x = max(left_paddle.x + PADDLE_LENGTH, ball_position.x);
+    }
+    // Bounce on right paddle
+    if (((ball_position.x + BALL_LENGTH) >= (right_paddle.x )) &&  ((ball_position.y + BALL_HEIGHT - 1) >= right_paddle.y) && (ball_position.y <= (right_paddle.y + PADDLE_HEIGHT))) {
+        ball_speed.x = ball_speed.x * -1;
+        // In case the ball is about to fly off the board bounds, make it stick to the paddle
+        ball_position.x = min(ball_position.x, right_paddle.x - BALL_LENGTH);
+    }
+    draw_ball();
     // Reflect ball y speed if it hits a wall
-    if (ball_position.y == 0 || (ball_position.y == (Y_DIMEN - BALL_HEIGHT))) ball_speed.y = ball_speed.y * -1;
-    // If the ball hits the left or right wall, change score and return
-    if (ball_position.x == 0) {
+    if (ball_position.y == 0 || (ball_position.y == (Y_DIMEN -1 - BALL_HEIGHT))) ball_speed.y = ball_speed.y * -1;
+    
+    // If the ball hits a wall on the left or right side, adjust the score and reset the game
+    if (ball_position.x <= 0) {
         right_score += 1;
         reset_game();
         return;
     }
-    if (ball_position.x == ((X_DIMEN - 1) - BALL_LENGTH)) {
+    if (ball_position.x >= ((X_DIMEN - 1) - BALL_LENGTH)) {
         left_score += 1;
         reset_game();
         return;
     }
-    //
-    if (((ball_position.x - 1) == left_paddle.x - PADDLE_LENGTH) &&  ((ball_position.y - BALL_HEIGHT) >= left_paddle.y) && (ball_position.y <= (left_paddle.y + PADDLE_HEIGHT))) {
-        ball_speed.x = ball_speed.x * -1;
-    }
-    if (((ball_position.x + BALL_LENGTH) == right_paddle.x -1) &&  ((ball_position.y - BALL_HEIGHT) >= right_paddle.y) && (ball_position.y <= (right_paddle.y + PADDLE_HEIGHT))) {
-        ball_speed.x = ball_speed.x * -1;
-    }
-    erase_ball();
-    ball_position.y += ball_speed.y;
-    ball_position.x += ball_speed.x;
-    draw_ball();
-    
+        
 }
 
 void draw_area(int starty, int startx, int endy, int endx, chtype ch) {
@@ -204,6 +221,7 @@ void run_game() {
     while (true) {
         time_t now = time(NULL);
         if (last - now) move_ball();
+        last = now;
         int v = getch();
         switch (v) {
             case 'w':
@@ -223,7 +241,6 @@ void run_game() {
                 safe_error_exit(1, "User hit q\n");
                 break;
         }
-        last = now;
         usleep(20);
     }
     endwin();
