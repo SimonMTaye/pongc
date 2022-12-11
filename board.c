@@ -1,12 +1,6 @@
 #include "board.h"
 #include "constants.h"
-#include <ncurses.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <time.h>
-#include <unistd.h>
-
+#include <math.h>
 
 typedef struct vector {
     int16_t x;
@@ -20,6 +14,7 @@ void debug(char* message);
 // Min-Max macros
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
 #define min(X,Y) ((X) < (Y) ? (X) : (Y))
+#define bound(UP, DOWN, X) (max((min(UP, X)), DOWN)) 
 
 // Scaled and Offset aware area draws
 #define draw_area_offset(starty, startx, endy, endx, ch) draw_area(starty + NS_OFFSET.y, startx + NS_OFFSET.x, endy + NS_OFFSET.y, endx + NS_OFFSET.x, ch)
@@ -87,7 +82,7 @@ void init_game_constants() {
 
     // Initialize ball constants
     ball_speed.y = 1;
-    ball_speed.x = 4;
+    ball_speed.x = 1;
     ball_position.y = Y_DIMEN / 2;
     ball_position.x = X_DIMEN / 2;
     
@@ -132,23 +127,27 @@ void debug(char * message) {
 
 }
 
-// TODO: Bounces of paddle bottom in a way it shouldn't
+// TODO: Bouncing should take into both start and end coordinates of the ball incase in jumps multiple spaces
+// Only if non-1 
 void move_ball() {
     erase_ball();
     ball_position.y += ball_speed.y;
     ball_position.x += ball_speed.x;
+    ball_position.y = bound(Y_DIMEN - BALL_HEIGHT, 0, ball_position.y);
+    ball_position.x = bound(X_DIMEN - BALL_LENGTH, 0, ball_position.x);
     // Bounce on left paddle
-    if ((ball_position.x) <= (left_paddle.x + PADDLE_LENGTH) &&  ((ball_position.y + BALL_HEIGHT - 1) >= left_paddle.y) && (ball_position.y <= (left_paddle.y + PADDLE_HEIGHT))) {
+    if ((ball_position.x) == (left_paddle.x + PADDLE_LENGTH) &&  ((ball_position.y + BALL_HEIGHT - 1) >= left_paddle.y) && (ball_position.y <= (left_paddle.y + PADDLE_HEIGHT -  1))) {
         ball_speed.x = ball_speed.x * -1;
         // In case the ball is about to fly off the board bounds, make it stick to the paddle
         ball_position.x = max(left_paddle.x + PADDLE_LENGTH, ball_position.x);
     }
     // Bounce on right paddle
-    if (((ball_position.x + BALL_LENGTH) >= (right_paddle.x )) &&  ((ball_position.y + BALL_HEIGHT - 1) >= right_paddle.y) && (ball_position.y <= (right_paddle.y + PADDLE_HEIGHT))) {
+    if ( ((ball_position.x + BALL_LENGTH) == right_paddle.x) &&  ((ball_position.y + BALL_HEIGHT - 1) >= right_paddle.y) && (ball_position.y <= (right_paddle.y + PADDLE_HEIGHT - 1))) {
         ball_speed.x = ball_speed.x * -1;
         // In case the ball is about to fly off the board bounds, make it stick to the paddle
         ball_position.x = min(ball_position.x, right_paddle.x - BALL_LENGTH);
     }
+
     draw_ball();
     // Reflect ball y speed if it hits a wall
     if (ball_position.y == 0 || (ball_position.y == (Y_DIMEN -1 - BALL_HEIGHT))) ball_speed.y = ball_speed.y * -1;
@@ -214,14 +213,23 @@ void reset_game() {
     refresh();
 }
 
+int getmilis() {
+    struct timespec t;
+    clock_gettime(CLOCK_REALTIME, &t);
+    return lround(t.tv_nsec / 1e06);
+}
+
 void run_game() {
     reset_score();
     reset_game();
-    time_t last = time(NULL);
+    int last = getmilis();
+    int now; 
     while (true) {
-        time_t now = time(NULL);
-        if (last - now) move_ball();
-        last = now;
+        now = getmilis(); 
+        if ((now - last) > BALL_MOVE_INTERVAL) {
+            last = now;
+            move_ball();
+        }
         int v = getch();
         switch (v) {
             case 'w':

@@ -25,6 +25,8 @@
 #define BORDER_CH ACS_BULLET
 
 #define SCORE_LINE_LENGTH X_DIMEN
+#define SLEEP_INTERVAL 20
+#define BALL_MOVE_INTERVAL 800
 
 #endif
 
