@@ -123,8 +123,7 @@ void debug(char * message) {
     // Use low-level draw since score is off the game board
     draw_area((NS_OFFSET.y / 2) +1, NS_OFFSET.x, (NS_OFFSET.y /2) + 2, NS_OFFSET.x + X_DIMEN, ' ');
     move((NS_OFFSET.y / 2) + 1, (COLS / 2) - (X_DIMEN/2));
-    printw(message);
-
+    printw("%s", message);
 }
 
 // TODO: Bouncing should take into both start and end coordinates of the ball incase in jumps multiple spaces
@@ -216,7 +215,7 @@ void reset_game() {
 int getmilis() {
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
-    return lround(t.tv_nsec / 1e06);
+    return (t.tv_sec * 1000) + lround(t.tv_nsec / 1e06);
 }
 
 void run_game() {
@@ -249,7 +248,7 @@ void run_game() {
                 safe_error_exit(1, "User hit q\n");
                 break;
         }
-        usleep(20);
+        usleep(SLEEP_INTERVAL);
     }
     endwin();
 }

@@ -1,12 +1,6 @@
 #ifndef GLOBAL_CONSTANTS
 #define GLOBAL_CONSTANTS
 
-#include <ncurses.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <pthread.h>
-
 // Dimesions for the game and the paddle
 #define X_DIMEN 32
 #define Y_DIMEN 10
