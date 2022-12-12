@@ -1,26 +1,28 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define FILE_PATH "./stats.dta"
+#define PONG_FILE_PATH "./stats.dta"
 
-typedef struct entry {
-    char name[100];
-    double win_percentage;
-    int games_won;
-} player_stat_entry;
-
-typedef struct header {
-    int16_t players;
-    int64_t file_size;
-} pong_file_header_t;
 
 typedef struct file_entry {
-    uint8_t name[100];
-    int16_t played;
-    int16_t won;
+    uint8_t name[128];
+    int32_t played;
+    int32_t won;
+    double win_percentage;
 } pong_file_entry_t;
 
 typedef struct file {
-    pong_file_header_t* header;
+    int32_t num_entries;
     pong_file_entry_t* entries;
-}pong_file_t;
+} pong_file_t;
+
+pong_file_t* read_file();
+void flush_to_file(pong_file_t* file_ds);
+
+void sort_win_percentage(pong_file_t* file_ds);
+void sort_win_count(pong_file_t* file_ds);
+
+void add_win(pong_file_t* file_ds, char* player);
+void add_loss(pong_file_t* file_ds, char* player);
