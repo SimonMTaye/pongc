@@ -1,16 +1,11 @@
-#include "board.h"
+#include "game.h"
 #include "constants.h"
 #include <math.h>
 
-typedef struct vector {
-    int16_t x;
-    int16_t y;
-} vector_t;
 
 void draw_area(int starty, int startx, int endy, int endx, chtype ch);
 void reset_game();
 void debug(char* message);
-
 // Min-Max macros
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
 #define min(X,Y) ((X) < (Y) ? (X) : (Y))
@@ -18,8 +13,8 @@ void debug(char* message);
 
 // Scaled and Offset aware area draws
 #define draw_area_offset(starty, startx, endy, endx, ch) draw_area(starty + NS_OFFSET.y, startx + NS_OFFSET.x, endy + NS_OFFSET.y, endx + NS_OFFSET.x, ch)
-#define draw_area_scaled(starty, startx, endy, endx, ch) draw_area(starty * SCALE, startx * SCALE, endy* SCALE, endx * SCALE, ch)
-#define draw_area_scaled_offset(starty, startx, endy, endx, ch) draw_area_offset(starty * SCALE, startx * SCALE, endy * SCALE, endx * SCALE, ch);
+#define draw_area_scaled(starty, startx, endy, endx, ch) draw_area(starty * GAME_SCALE, startx * GAME_SCALE, endy* GAME_SCALE, endx * GAME_SCALE, ch)
+#define draw_area_scaled_offset(starty, startx, endy, endx, ch) draw_area((starty * GAME_SCALE) + NS_OFFSET.y, (startx * GAME_SCALE) + NS_OFFSET.x, (endy * GAME_SCALE) + NS_OFFSET.y, (endx * GAME_SCALE) + NS_OFFSET.x, ch);
 
 //  Erase Macros
 #define erase_area(starty, startx, endy, endx) draw_area_scaled_offset(starty, startx, endy, endx, ' ')
@@ -43,7 +38,7 @@ vector_t left_paddle;
 vector_t NS_OFFSET;
 vector_t NS_END;
 
-int SCALE;
+int GAME_SCALE;
 
 // Flags for checking initialization
 int CURSES_INIT = 0;
@@ -53,6 +48,8 @@ int right_score = 0;
 int left_score = 0;
 
 void init_curses() {
+    if (CURSES_INIT) return;
+    CURSES_INIT = 1;
     // Init curses library
     initscr();
     // Do not wait for linebreaks before transmitting user input
@@ -75,10 +72,13 @@ void init_game_constants() {
         exit(1);
     }
     // Used to scale game on terminals significantly bigger than the game dimensions
-    SCALE = 1;
-    // Center the game
-    NS_OFFSET.y = (LINES - Y_DIMEN) / 2;
-    NS_OFFSET.x = (COLS - X_DIMEN) / 2;
+    GAME_SCALE = 1;
+    // Determine the end coordinates of the board
+    NS_END.x = X_DIMEN * GAME_SCALE;
+    NS_END.y = Y_DIMEN * GAME_SCALE;
+
+    NS_OFFSET.y = (LINES - NS_END.y) / 2;
+    NS_OFFSET.x = (COLS - NS_END.x) / 2;
 
     // Initialize ball constants
     ball_speed.y = 1;
@@ -87,7 +87,7 @@ void init_game_constants() {
     ball_position.x = X_DIMEN / 2;
     
     // Initialize paddle positions
-    right_paddle.y = Y_DIMEN / 2;
+    right_paddle.y = Y_DIMEN  / 2;
     right_paddle.x = (X_DIMEN -1) - PADDLE_LENGTH;
 
     left_paddle.y = Y_DIMEN / 2;
@@ -121,7 +121,7 @@ void left_paddle_down(){
 
 void debug(char * message) {
     // Use low-level draw since score is off the game board
-    draw_area((NS_OFFSET.y / 2) +1, NS_OFFSET.x, (NS_OFFSET.y /2) + 2, NS_OFFSET.x + X_DIMEN, ' ');
+    draw_area((NS_OFFSET.y / 2) +1, NS_OFFSET.x, (NS_OFFSET.y /2) + 2, NS_OFFSET.x + (X_DIMEN * GAME_SCALE), ' ');
     move((NS_OFFSET.y / 2) + 1, (COLS / 2) - (X_DIMEN/2));
     printw("%s", message);
 }
@@ -189,7 +189,7 @@ void safe_error_exit(int status, char* message) {
 
 void print_score() {
     // Use low-level draw since score is off the game board
-    draw_area(NS_OFFSET.y / 2, NS_OFFSET.x, (NS_OFFSET.y /2) + 1, NS_OFFSET.x + X_DIMEN, ' ');
+    draw_area(NS_OFFSET.y / 2, NS_OFFSET.x, (NS_OFFSET.y /2) + 1, NS_OFFSET.x + (X_DIMEN * GAME_SCALE), ' ');
     move(NS_OFFSET.y / 2, (COLS / 2) - 3);
     printw("%d - %d", left_score, right_score);
 
@@ -201,7 +201,7 @@ void reset_score() {
 }
 
 void reset_game() {
-    if (!CURSES_INIT) init_curses();
+    init_curses();
     clear();
     init_game_constants();
     draw_borders();
@@ -231,16 +231,16 @@ void run_game() {
         }
         int v = getch();
         switch (v) {
-            case 'w':
+            case LEFT_PADDLE_UP:
                 left_paddle_up();
                 break;
-            case 's':
+            case LEFT_PADDLE_DOWN:
                 left_paddle_down();
                 break;
-            case KEY_UP:
+            case RIGHT_PADDLE_UP:
                 right_paddle_up();
                 break;
-            case KEY_DOWN:
+            case RIGHT_PADDLE_DOWN:
                 right_paddle_down();
                 break;
             // TODO: Remove

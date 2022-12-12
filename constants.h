@@ -1,27 +1,33 @@
-#ifndef GLOBAL_CONSTANTS
-#define GLOBAL_CONSTANTS
+#ifndef PONG_GLOBAL_CONSTANTS
+#define PONG_GLOBAL_CONSTANTS
 
+/************************** CONSTANTS USED BY THE GAME *******************************/
 // Dimesions for the game and the paddle
-#define X_DIMEN 32
-#define Y_DIMEN 10
-#define PADDLE_HEIGHT 2 
-#define PADDLE_LENGTH 1 
-#define BALL_HEIGHT 1 
-#define BALL_LENGTH 1 
-
-// Lines used for debug output
-#define DEBUG_LINE_START 5
-#define DEBUG_LINE_END 10
+#define X_DIMEN                 32              // The X width of the board
+#define Y_DIMEN                 10              // The Y height of the board
+#define PADDLE_HEIGHT           2               // Height of the paddle
+#define PADDLE_LENGTH           1               // Width of the paddle
+#define BALL_HEIGHT             1               // Height of the ball
+#define BALL_LENGTH             1               // Length of the ball
 
 // Characters used for drawing game entities
-#define BALL_CH ACS_BLOCK
-#define PADDLE_CH ACS_BLOCK
-#define BORDER_CH ACS_BULLET
+#define BALL_CH                 ACS_BLOCK       // Character used to draw ball
+#define PADDLE_CH               ACS_BLOCK       // Character Used to draw the paddle
+#define BORDER_CH               ACS_BULLET      // Character used to draw walls and the background
 
-#define SCORE_LINE_LENGTH X_DIMEN
-#define SLEEP_INTERVAL 20
-#define BALL_MOVE_INTERVAL 800
+#define SCORE_LINE_LENGTH       X_DIMEN         // Width of score board
+#define SLEEP_INTERVAL          20              // Sleep interval (ms) between checking for user input. (Reverse FPS)
+#define BALL_MOVE_INTERVAL      800             // How to long to wait before moving the ball (ms)
+
+// Keys used for controlling the paddles
+#define LEFT_PADDLE_UP          'w'          
+#define LEFT_PADDLE_DOWN        's'        
+#define RIGHT_PADDLE_UP         KEY_UP 
+#define RIGHT_PADDLE_DOWN       KEY_DOWN
+
+/************************** CONSTANTS USED BY MENU *******************************/
 
 #endif
+
 
 
