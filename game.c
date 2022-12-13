@@ -74,8 +74,11 @@ void init_game_constants() {
         perror("Screen is too small\n");
         exit(1);
     }
+    // -6 to account for some UI elements
+    int y_scale = (LINES - 6) / Y_DIMEN;
+    int x_scale = COLS / X_DIMEN;
     // Used to scale game on screens bigger than the games dimensions
-    GAME_SCALE = 2;
+    GAME_SCALE = min(x_scale, y_scale);
     // Determine the end coordinates of the board
     NS_END.x = X_DIMEN * GAME_SCALE;
     NS_END.y = Y_DIMEN * GAME_SCALE;

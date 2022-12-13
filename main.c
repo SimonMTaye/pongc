@@ -1,6 +1,7 @@
 #include "constants.h"
 #include "game.h"
 #include <curses.h>
+#include <stdlib.h>
 
 #define LEADERBOARD_ENTRIES 5
 
@@ -79,7 +80,11 @@ char* get_name(char* message) {
             counter ++;
         }
     }
-    name[counter -1] = '\0';
+    // Add space for a null terminator
+    if (counter == size) {
+        name = realloc(name,  sizeof(char) * (size + 1));
+    }
+    name[counter] = '\0';
     curs_set(0);
     return name;
 }
