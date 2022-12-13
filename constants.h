@@ -17,7 +17,7 @@
 
 #define SCORE_LINE_LENGTH       X_DIMEN         // Width of score board
 #define SLEEP_INTERVAL          20              // Sleep interval (ms) between checking for user input. (Reverse FPS)
-#define BALL_MOVE_INTERVAL      800             // How to long to wait before moving the ball (ms)
+#define BALL_MOVE_INTERVAL      600             // How to long to wait before moving the ball (ms)
 
 // Keys used for controlling the paddles
 #define LEFT_PADDLE_UP          'w'          
@@ -25,6 +25,7 @@
 #define RIGHT_PADDLE_UP         KEY_UP 
 #define RIGHT_PADDLE_DOWN       KEY_DOWN
 
+#define MAX_SCORE               3              // Number of points needed to win the game
 /************************** CONSTANTS USED BY MENU *******************************/
 
 #endif

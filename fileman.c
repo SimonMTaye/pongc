@@ -1,9 +1,5 @@
 #include "fileman.h"
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 pong_file_t* read_file() {
     pong_file_t* file_ds = malloc(sizeof(pong_file_t));
@@ -17,7 +13,7 @@ pong_file_t* read_file() {
     int res = fread(&(file_ds->num_entries), sizeof(file_ds->num_entries), 1, file);
     if (res != 1) {
         char buffer[100];
-        sprintf(buffer, "error reading game: unexpected number of num_entries (e: %d, a: %d)", 1, res);
+        sprintf(buffer, "error reading game: expexted only one value to be read, actual: %d)", res);
         perror(buffer);
         exit(EXIT_FAILURE);
     }
@@ -25,7 +21,7 @@ pong_file_t* read_file() {
     res = fread(file_ds->entries, sizeof(pong_file_entry_t), file_ds->num_entries, file);
     if (res != file_ds->num_entries) {
         char buffer[100];
-        sprintf(buffer, "error reading game: unexpected number of num_entries (e: %d, a: %d)", 1, res);
+        sprintf(buffer, "error reading game: unexpected number of entries read (e: %d, a: %d)", 1, res);
         perror(buffer);
         exit(EXIT_FAILURE);
     }
@@ -53,6 +49,7 @@ void flush_to_file(pong_file_t *file_ds) {
     }
     free(file_ds->entries);
     free(file_ds);
+    fclose(file);
 }
 
 void sort_win_count(pong_file_t* file_ds) {
@@ -93,7 +90,7 @@ pong_file_entry_t* add_player(pong_file_t* file_ds, char* name) {
         file_ds->entries = realloc(file_ds->entries,  sizeof(pong_file_entry_t) * file_ds->num_entries);
     }
     pong_file_entry_t* new_entry = &(file_ds->entries[file_ds->num_entries - 1]);
-    strncpy((char*) new_entry->name, name, 100);
+    strncpy((char*) new_entry->name, name, strlen(name));
     new_entry->played = 1;
     return new_entry;
 }

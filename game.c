@@ -1,31 +1,27 @@
 #include "game.h"
 #include "constants.h"
-#include <math.h>
-
+#include <curses.h>
+#include <unistd.h>
 
 void draw_area(int starty, int startx, int endy, int endx, chtype ch);
+void draw_area_debug(int starty, int startx, int endy, int endx, chtype ch);
 void reset_game();
-void debug(char* message);
-// Min-Max macros
-#define max(X,Y) ((X) > (Y) ? (X) : (Y))
-#define min(X,Y) ((X) < (Y) ? (X) : (Y))
-#define bound(UP, DOWN, X) (max((min(UP, X)), DOWN)) 
-
+void debug(char* message, int offset);
 // Scaled and Offset aware area draws
-#define draw_area_offset(starty, startx, endy, endx, ch) draw_area(starty + NS_OFFSET.y, startx + NS_OFFSET.x, endy + NS_OFFSET.y, endx + NS_OFFSET.x, ch)
-#define draw_area_scaled(starty, startx, endy, endx, ch) draw_area(starty * GAME_SCALE, startx * GAME_SCALE, endy* GAME_SCALE, endx * GAME_SCALE, ch)
-#define draw_area_scaled_offset(starty, startx, endy, endx, ch) draw_area((starty * GAME_SCALE) + NS_OFFSET.y, (startx * GAME_SCALE) + NS_OFFSET.x, (endy * GAME_SCALE) + NS_OFFSET.y, (endx * GAME_SCALE) + NS_OFFSET.x, ch);
+//#define draw_area_offset(starty, startx, endy, endx, ch) draw_area(starty + NS_OFFSET.y, startx + NS_OFFSET.x, endy + NS_OFFSET.y, endx + NS_OFFSET.x, ch)
+//#define draw_area_scaled(starty, startx, endy, endx, ch) draw_area(starty * GAME_SCALE, startx * GAME_SCALE, endy* GAME_SCALE, endx * GAME_SCALE, ch)
+#define draw_area_scaled_offset(starty, startx, endy, endx, ch) draw_area_debug(((starty) * GAME_SCALE) + NS_OFFSET.y, ((startx) * GAME_SCALE) + NS_OFFSET.x, ((endy) * GAME_SCALE) + NS_OFFSET.y, ((endx) * GAME_SCALE) + NS_OFFSET.x, ch);
 
 //  Erase Macros
 #define erase_area(starty, startx, endy, endx) draw_area_scaled_offset(starty, startx, endy, endx, ' ')
-#define erase_ball() erase_area(ball_position.y, ball_position.x, ball_position.y + BALL_HEIGHT, ball_position.x + BALL_LENGTH)
-#define erase_right_paddle() erase_area(right_paddle.y, right_paddle.x, right_paddle.y + PADDLE_HEIGHT, right_paddle.x + PADDLE_LENGTH)
-#define erase_left_paddle() erase_area(left_paddle.y, left_paddle.x, left_paddle.y + PADDLE_HEIGHT, left_paddle.x + PADDLE_LENGTH)
+#define erase_ball() erase_area((ball_position.y), (ball_position.x), (ball_position.y + BALL_HEIGHT), (ball_position.x + BALL_LENGTH))
+#define erase_right_paddle() erase_area((right_paddle.y), (right_paddle.x), (right_paddle.y + PADDLE_HEIGHT), (right_paddle.x + PADDLE_LENGTH))
+#define erase_left_paddle() erase_area((left_paddle.y), (left_paddle.x), (left_paddle.y + PADDLE_HEIGHT), (left_paddle.x + PADDLE_LENGTH))
 // Draw Macros
-#define draw_paddle(starty, startx) draw_area_scaled_offset(starty, startx, starty + PADDLE_HEIGHT, startx + PADDLE_LENGTH, PADDLE_CH)
-#define draw_ball() draw_area_scaled_offset(ball_position.y, ball_position.x, ball_position.y + BALL_HEIGHT, ball_position.x + BALL_LENGTH, BALL_CH)
-#define draw_right_paddle() draw_paddle(right_paddle.y, right_paddle.x)
-#define draw_left_paddle() draw_paddle(left_paddle.y, left_paddle.x)
+#define draw_paddle(starty, startx) draw_area_scaled_offset((starty), (startx), (starty + PADDLE_HEIGHT), (startx + PADDLE_LENGTH), PADDLE_CH)
+#define draw_ball() draw_area_scaled_offset((ball_position.y), (ball_position.x), (ball_position.y + BALL_HEIGHT), (ball_position.x + BALL_LENGTH), BALL_CH)
+#define draw_right_paddle() draw_paddle((right_paddle.y), (right_paddle.x))
+#define draw_left_paddle() draw_paddle((left_paddle.y), (left_paddle.x))
 
 
 // Position Constants
@@ -37,8 +33,11 @@ vector_t left_paddle;
 // Vector constants for determining board area. ns indcates no scale applied
 vector_t NS_OFFSET;
 vector_t NS_END;
-
+// Scale for drawing game elements
 int GAME_SCALE;
+
+// Bool for checking if game should keep looping
+bool RUN_GAME = true;
 
 // Flags for checking initialization
 int CURSES_INIT = 0;
@@ -46,6 +45,10 @@ int CURSES_INIT = 0;
 // Score variables
 int right_score = 0;
 int left_score = 0;
+
+// Name of the players for stat tracking
+char* left_player;
+char* right_player;
 
 void init_curses() {
     if (CURSES_INIT) return;
@@ -71,27 +74,15 @@ void init_game_constants() {
         perror("Screen is too small\n");
         exit(1);
     }
-    // Used to scale game on terminals significantly bigger than the game dimensions
-    GAME_SCALE = 1;
+    // Used to scale game on screens bigger than the games dimensions
+    GAME_SCALE = 2;
     // Determine the end coordinates of the board
     NS_END.x = X_DIMEN * GAME_SCALE;
     NS_END.y = Y_DIMEN * GAME_SCALE;
-
+    // Determine the offset needed to center the pong board
     NS_OFFSET.y = (LINES - NS_END.y) / 2;
     NS_OFFSET.x = (COLS - NS_END.x) / 2;
-
-    // Initialize ball constants
-    ball_speed.y = 1;
-    ball_speed.x = 1;
-    ball_position.y = Y_DIMEN / 2;
-    ball_position.x = X_DIMEN / 2;
     
-    // Initialize paddle positions
-    right_paddle.y = Y_DIMEN  / 2;
-    right_paddle.x = (X_DIMEN -1) - PADDLE_LENGTH;
-
-    left_paddle.y = Y_DIMEN / 2;
-    left_paddle.x = 0;
 }
 
 
@@ -119,15 +110,43 @@ void left_paddle_down(){
     draw_left_paddle();
 }
 
-void debug(char * message) {
-    // Use low-level draw since score is off the game board
-    draw_area((NS_OFFSET.y / 2) +1, NS_OFFSET.x, (NS_OFFSET.y /2) + 2, NS_OFFSET.x + (X_DIMEN * GAME_SCALE), ' ');
-    move((NS_OFFSET.y / 2) + 1, (COLS / 2) - (X_DIMEN/2));
+void debug(char * message, int offset) {
+    int y = (LINES - ((NS_OFFSET.y / 2) +1)) + offset;
+    draw_area(y, 0, y+1, COLS, ' ');
+    move(y, (COLS / 2) - (X_DIMEN/2));
     printw("%s", message);
+    refresh();
 }
 
-// TODO: Bouncing should take into both start and end coordinates of the ball incase in jumps multiple spaces
-// Only if non-1 
+void game_over_screen(char* winner) {
+    clear();
+    int center_offset_x = (strlen(winner) / 2) + 8;
+    move(LINES / 2, (COLS / 2) - center_offset_x);
+    printw("CONGRATULATIONS %s", winner);
+    refresh();
+    sleep(3);
+    flushinp();
+    return;
+}
+
+void check_for_game_over() {
+    // If scores are below threshold, no game over so return
+    if ((right_score < MAX_SCORE) && (left_score < MAX_SCORE)) return;
+    char * winner = left_player;
+    char * loser = right_player;
+    if (right_score >= MAX_SCORE) {
+        winner = right_player;
+        loser = left_player;
+    }
+    pong_file_t* file_ds = read_file();
+    add_win(file_ds, winner);  
+    add_loss(file_ds, loser);  
+    flush_to_file(file_ds);
+    file_ds = NULL;
+    RUN_GAME = false;
+    game_over_screen(winner);
+}
+
 void move_ball() {
     erase_ball();
     ball_position.y += ball_speed.y;
@@ -155,18 +174,28 @@ void move_ball() {
     if (ball_position.x <= 0) {
         right_score += 1;
         reset_game();
+        check_for_game_over();
         return;
     }
     if (ball_position.x >= ((X_DIMEN - 1) - BALL_LENGTH)) {
         left_score += 1;
         reset_game();
+        check_for_game_over();
         return;
     }
         
 }
 
+void draw_area_debug(int starty, int startx, int endy, int endx, chtype ch) {
+    char* buff = malloc(sizeof(char) * 100);
+    sprintf(buff, "[DRAW AREA] Y: (%d, %d), X: (%d, %d)", starty, endy, startx, endx);
+    debug(buff, 0);
+    free(buff);
+    draw_area(starty, startx, endy, endx, ch);
+}
+
 void draw_area(int starty, int startx, int endy, int endx, chtype ch) {
-    for (int i = starty; i < endy; i++) {
+        for (int i = starty; i < endy; i++) {
         move(i,startx);
         for (int j = startx; j < endx; j++) {
             addch( ch);
@@ -195,20 +224,40 @@ void print_score() {
 
 }
 
+void reset_positions() {
+    // Initialize ball constants
+    ball_speed.y = 1;
+    ball_speed.x = 1;
+    ball_position.y = Y_DIMEN / 2;
+    ball_position.x = X_DIMEN / 2;
+    
+    // Initialize paddle positions
+    right_paddle.y = Y_DIMEN  / 2;
+    right_paddle.x = (X_DIMEN -1) - PADDLE_LENGTH;
+    left_paddle.y = Y_DIMEN / 2;
+    left_paddle.x = 0;
+
+}
+
 void reset_score() {
+    // Set score to 0
     right_score = 0;
     left_score = 0;
 }
 
+
+
 void reset_game() {
-    init_curses();
     clear();
-    init_game_constants();
+    reset_positions();
     draw_borders();
     draw_left_paddle();
     draw_right_paddle();
     draw_ball();
     print_score();
+    char buff[100];
+    sprintf(buff, "[CONSTANTS] (Y,X) NS_OFFSET: (%d, %d) NS_END: (%d, %d) GAME_SCALE: %d", NS_OFFSET.y, NS_OFFSET.x, NS_END.y, NS_END.x, GAME_SCALE);
+    debug(buff, 2);
     refresh();
 }
 
@@ -218,12 +267,20 @@ int getmilis() {
     return (t.tv_sec * 1000) + lround(t.tv_nsec / 1e06);
 }
 
-void run_game() {
+void run_game(char* left, char* right) {
+    // Save player names
+    left_player = left;
+    right_player = right;
+    // Init Curses
+    init_curses();
+    init_game_constants();
+    // Reset game
     reset_score();
     reset_game();
     int last = getmilis();
     int now; 
-    while (true) {
+    RUN_GAME = true;
+        while (RUN_GAME) {
         now = getmilis(); 
         if ((now - last) > BALL_MOVE_INTERVAL) {
             last = now;
@@ -243,10 +300,8 @@ void run_game() {
             case RIGHT_PADDLE_DOWN:
                 right_paddle_down();
                 break;
-            // TODO: Remove
             case 'q':
-                safe_error_exit(1, "User hit q\n");
-                break;
+                return;
         }
         usleep(SLEEP_INTERVAL);
     }

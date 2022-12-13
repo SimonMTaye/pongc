@@ -2,52 +2,85 @@
 #include "game.h"
 #include <curses.h>
 
-int MENU_SCALE = 1;
-vector_t half;
+#define LEADERBOARD_ENTRIES 5
 
-void show_menu();
+int MENU_SCALE = 1;
+
+vector_t half;
+char* player = NULL;
+
+void menu_start();
+void leaderboard();
+char* get_name(char* message);
 
 int main(void) {
-    show_menu();
+    menu_start();
 }
-
 
 void init_menu_constants() {
     // Set the character processing to be non-blocking
     nodelay(stdscr, false);
-    // Show cursor
-    curs_set(1);
+    // Hide cursor
+    curs_set(0);
+    // Get keyboard input completely.
+    keypad(stdscr, true);
+    cbreak();
+    // Init Half Width and Length to avoid recomputation
     half.x = COLS / 2;
     half.y = LINES / 2;
 }
 
+// Utility functions
 void print_centered(int y, char* message) {
     int length = strlen(message);
     move(y, half.x - (length / 2));
     printw("%s", message);
 }
 
-char* get_name() {
+void clear_and_title() {
+    clear();
+    flushinp();
     print_centered(half.y - 7, "PONG!");
-    print_centered(half.y + 2, "ENTER YOUR NAME:");
-    move(half.y + 3, half.x - 4);
+}
+
+char* get_name(char* message) {
+    clear_and_title();
+    int menu_items_start = half.y;
+    print_centered(menu_items_start, message);
+    print_centered(menu_items_start + 2, "ENTER YOUR NAME:");
+    move(menu_items_start + 3, half.x - 4);
     int v = 0;
     int counter = 0;
     int size = 50;
     char* name = malloc(sizeof(char) * size);
+    curs_set(2);
     while (v != '\n') {
         v = getch();
         if (v == ERR) {
             safe_error_exit(1, "Error reading char from keyboard");
         }
-        addch(v);
-        if (counter == size) {
-            size *= 2;
-            name = realloc(name, sizeof(char) * size);
+        if (v == KEY_BACKSPACE || v == '\b' || v == 127) {
+            counter --;
+            counter = max(0, counter);
+            mvaddch(menu_items_start+3, half.x - 4 + counter, ' ');
+            move(menu_items_start+3, half.x-4 + counter);
+            refresh();
+            name[counter]  = '\0';
+            continue;
         }
-        name[counter] = (char) v;
-        counter ++;
+        if (((char) v <= 'z') && ((char) v >= 'A')) {
+            addch(v);
+            if (counter == size) {
+                size *= 2;
+                name = realloc(name, sizeof(char) * size);
+            }
+
+            name[counter] = (char) v;
+            counter ++;
+        }
     }
+    name[counter -1] = '\0';
+    curs_set(0);
     return name;
 }
 
@@ -61,33 +94,88 @@ void print_ip() {
 }
 
 
-void show_options() {
-    clear();
-    print_centered(half.y - 7, "PONG!");
-    print_centered(half.y - 3, "(P)lay");
-    print_centered(half.y - 2, "(C)onnect");
-    print_centered(half.y - 1, "(L)eaderboard");
-    print_centered(half.y, "(Q)uit");
-    flushinp();
+void leaderboard() {
+    clear_and_title();
+    print_centered(half.y - 5, "(B)ack");
+    pong_file_t* file_ds = read_file();
+    int entries_to_show = (LEADERBOARD_ENTRIES > file_ds->num_entries) ? file_ds->num_entries : LEADERBOARD_ENTRIES;
+    // DISPLAY TOTAL WINS COLUMN
+    sort_win_count(file_ds);
+    move(half.y - 2, half.x - 30);
+    printw("Total Wins");
+    for (int i = 0; i < entries_to_show; i++) {
+        move(half.y + i, half.x - 30);
+        pong_file_entry_t entry = file_ds->entries[i];
+        printw("%d: %s (%d win(s))", i + 1, entry.name, entry.won);
+    }
+    // DISPLAY WIN PERCENTAGE COLUMN
+    sort_win_percentage(file_ds);
+    move(half.y - 2, half.x + 20);
+    printw("Win Percentage");
+    for (int i = 0; i < entries_to_show; i++) {
+        move(half.y + i, half.x + 20);
+        pong_file_entry_t entry = file_ds->entries[i];
+        printw("%d: %s (%.2f%)", i+ 1, entry.name, (entry.win_percentage * 100));
+    }
     refresh();
     int v;
-    while (true) {
+    while(true) {
         v = getch();
         switch (v) {
-            case 'p':
-                run_game();
+            case 'b':
+            case 'B':
+                return; 
             case 'q':
-                safe_error_exit(0, "User quit game");
+            case 'Q':
+                safe_error_exit(0, "user quit game");
         }
     }
 }
 
-void show_menu() {
+void local_game(char* player_1) {
+    clear_and_title();
+    char* player_2 = get_name("PLAYER 2 (RIGHT PADDLE)");
+    // left, right
+    run_game(player_1, player_2);
+}
+
+void options() {
+    while (true) {
+        init_menu_constants();
+        clear_and_title();
+        int menu_items_start = half.y - 3;
+        print_centered(menu_items_start,   "(P)lay Localy");
+        print_centered(menu_items_start+1, "(C)onnect and Play");
+        print_centered(menu_items_start+2, "(L)eaderboard");
+        print_centered(menu_items_start+3, "(Q)uit");
+        flushinp();
+        refresh();
+        int v;
+        v = getch();
+        switch (v) {
+            case 'p':
+            case 'P':
+                local_game(player);
+                break;
+            case 'l':
+            case 'L':
+                leaderboard();
+                break;
+            case 'q':
+            case 'Q':
+                safe_error_exit(0, "user quit game");
+                return;
+        }
+        flushinp();
+    }
+}
+
+void menu_start() {
     init_curses();
     init_menu_constants();
     flushinp();
-    char* name = get_name();
-    //print_ip();
-    show_options();
-    
+    clear_and_title();
+    // Get the players name
+    if (player == NULL) player = get_name("HELLO! WELCOME TO PONG!");
+    options();
 }
