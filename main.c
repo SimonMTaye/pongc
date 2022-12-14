@@ -141,7 +141,7 @@ void local_game(char* player_1) {
     clear_and_title();
     char* player_2 = get_name("PLAYER 2 (RIGHT PADDLE)");
     // left, right
-    run_game(player_1, player_2);
+    run_local_game(player_1, player_2);
 }
 
 void options() {

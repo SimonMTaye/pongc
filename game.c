@@ -32,7 +32,6 @@ vector_t left_paddle;
 
 // Vector constants for determining board area. ns indcates no scale applied
 vector_t NS_OFFSET;
-vector_t NS_END;
 // Scale for drawing game elements
 int GAME_SCALE;
 
@@ -79,12 +78,9 @@ void init_game_constants() {
     int x_scale = COLS / X_DIMEN;
     // Used to scale game on screens bigger than the games dimensions
     GAME_SCALE = min(x_scale, y_scale);
-    // Determine the end coordinates of the board
-    NS_END.x = X_DIMEN * GAME_SCALE;
-    NS_END.y = Y_DIMEN * GAME_SCALE;
     // Determine the offset needed to center the pong board
-    NS_OFFSET.y = (LINES - NS_END.y) / 2;
-    NS_OFFSET.x = (COLS - NS_END.x) / 2;
+    NS_OFFSET.y = (LINES - (Y_DIMEN * GAME_SCALE)) / 2;
+    NS_OFFSET.x = (COLS - (X_DIMEN * GAME_SCALE)) / 2;
     
 }
 
@@ -97,7 +93,7 @@ void right_paddle_up() {
 
 void right_paddle_down(){
     erase_right_paddle();
-    right_paddle.y = min(right_paddle.y + 1, (Y_DIMEN - 1) - PADDLE_HEIGHT);
+    right_paddle.y = min(right_paddle.y + 1, Y_DIMEN - PADDLE_HEIGHT);
     draw_right_paddle();
 }
 
@@ -109,7 +105,7 @@ void left_paddle_up() {
 
 void left_paddle_down(){
     erase_left_paddle();
-    left_paddle.y = min(left_paddle.y + 1, (Y_DIMEN - 1) - PADDLE_HEIGHT);
+    left_paddle.y = min(left_paddle.y + 1, Y_DIMEN - PADDLE_HEIGHT);
     draw_left_paddle();
 }
 
@@ -151,27 +147,19 @@ void check_for_game_over() {
 }
 
 void move_ball() {
-    erase_ball();
-    ball_position.y += ball_speed.y;
-    ball_position.x += ball_speed.x;
-    ball_position.y = bound(Y_DIMEN - BALL_HEIGHT, 0, ball_position.y);
-    ball_position.x = bound(X_DIMEN - BALL_LENGTH, 0, ball_position.x);
     // Bounce on left paddle
     if ((ball_position.x) == (left_paddle.x + PADDLE_LENGTH) &&  ((ball_position.y + BALL_HEIGHT - 1) >= left_paddle.y) && (ball_position.y <= (left_paddle.y + PADDLE_HEIGHT -  1))) {
         ball_speed.x = ball_speed.x * -1;
-        // In case the ball is about to fly off the board bounds, make it stick to the paddle
-        ball_position.x = max(left_paddle.x + PADDLE_LENGTH, ball_position.x);
     }
     // Bounce on right paddle
     if ( ((ball_position.x + BALL_LENGTH) == right_paddle.x) &&  ((ball_position.y + BALL_HEIGHT - 1) >= right_paddle.y) && (ball_position.y <= (right_paddle.y + PADDLE_HEIGHT - 1))) {
         ball_speed.x = ball_speed.x * -1;
         // In case the ball is about to fly off the board bounds, make it stick to the paddle
-        ball_position.x = min(ball_position.x, right_paddle.x - BALL_LENGTH);
     }
+        // Reflect ball y speed if it hits a wall
+    if (ball_position.y == 0 || (ball_position.y == (Y_DIMEN - BALL_HEIGHT))) ball_speed.y = ball_speed.y * -1;
 
-    draw_ball();
-    // Reflect ball y speed if it hits a wall
-    if (ball_position.y == 0 || (ball_position.y == (Y_DIMEN -1 - BALL_HEIGHT))) ball_speed.y = ball_speed.y * -1;
+    
     
     // If the ball hits a wall on the left or right side, adjust the score and reset the game
     if (ball_position.x <= 0) {
@@ -180,13 +168,18 @@ void move_ball() {
         check_for_game_over();
         return;
     }
-    if (ball_position.x >= ((X_DIMEN - 1) - BALL_LENGTH)) {
+    if (ball_position.x >= (X_DIMEN  - BALL_LENGTH)) {
         left_score += 1;
         reset_game();
         check_for_game_over();
         return;
     }
-        
+    erase_ball();
+    ball_position.y += ball_speed.y;
+    ball_position.x += ball_speed.x;
+    ball_position.y = bound(Y_DIMEN - BALL_HEIGHT, 0, ball_position.y);
+    ball_position.x = bound(X_DIMEN - BALL_LENGTH, 0, ball_position.x);
+    draw_ball();
 }
 
 void draw_area_debug(int starty, int startx, int endy, int endx, chtype ch) {
@@ -207,10 +200,16 @@ void draw_area(int starty, int startx, int endy, int endx, chtype ch) {
 }
 
 void draw_borders() {
+    int bottom_end = NS_OFFSET.y + (Y_DIMEN * GAME_SCALE);
+    int right_end = NS_OFFSET.x + (X_DIMEN * GAME_SCALE);
+    // LEFT CHUNK
     draw_area(0, 0, LINES, NS_OFFSET.x, BORDER_CH);
-    draw_area(0, (COLS -1) - NS_OFFSET.x, LINES, COLS, BORDER_CH);
+    // RIGHT CHUNK
+    draw_area(0, right_end, LINES, COLS, BORDER_CH);
+    // TOP CHUNK
     draw_area(0, 0, NS_OFFSET.y, COLS, BORDER_CH);
-    draw_area((LINES - 1) - NS_OFFSET.y, 0, LINES, COLS, BORDER_CH);
+    // BOTTOM CHUNK
+    draw_area(bottom_end, 0, LINES, COLS, BORDER_CH);
 }
 
 void safe_error_exit(int status, char* message) {
@@ -236,7 +235,7 @@ void reset_positions() {
     
     // Initialize paddle positions
     right_paddle.y = Y_DIMEN  / 2;
-    right_paddle.x = (X_DIMEN -1) - PADDLE_LENGTH;
+    right_paddle.x = X_DIMEN - PADDLE_LENGTH ;
     left_paddle.y = Y_DIMEN / 2;
     left_paddle.x = 0;
 
@@ -259,7 +258,7 @@ void reset_game() {
     draw_ball();
     print_score();
     char buff[100];
-    sprintf(buff, "[CONSTANTS] (Y,X) NS_OFFSET: (%d, %d) NS_END: (%d, %d) GAME_SCALE: %d", NS_OFFSET.y, NS_OFFSET.x, NS_END.y, NS_END.x, GAME_SCALE);
+    sprintf(buff, "[CONSTANTS] (Y,X) NS_OFFSET: (%d, %d) GAME_SCALE: %d", NS_OFFSET.y, NS_OFFSET.x, GAME_SCALE);
     debug(buff, 2);
     refresh();
 }
@@ -270,7 +269,7 @@ int getmilis() {
     return (t.tv_sec * 1000) + lround(t.tv_nsec / 1e06);
 }
 
-void run_game(char* left, char* right) {
+void run_local_game(char* left, char* right) {
     // Save player names
     left_player = left;
     right_player = right;
