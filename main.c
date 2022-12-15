@@ -1,7 +1,9 @@
 #include "constants.h"
 #include "game.h"
 #include <curses.h>
+#include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define LEADERBOARD_ENTRIES 5
 
@@ -41,14 +43,15 @@ void print_centered(int y, char* message) {
 void clear_and_title() {
     clear();
     flushinp();
+    attron(A_BOLD);
     print_centered(half.y - 7, "PONG!");
+    attroff(A_BOLD);
 }
 
 char* get_name(char* message) {
     clear_and_title();
     int menu_items_start = half.y;
     print_centered(menu_items_start, message);
-    print_centered(menu_items_start + 2, "ENTER YOUR NAME:");
     move(menu_items_start + 3, half.x - 4);
     int v = 0;
     int counter = 0;
@@ -137,11 +140,36 @@ void leaderboard() {
     }
 }
 
+void networked_game(char* player) {
+    clear_and_title();
+    char* player_2 = strdup("Test");
+    char * server = get_name("Enter a server you want to connect to:");
+    pthread_t server_thread, client_thread;
+    pthread_create(&server_thread, NULL, listen_for_connections, NULL);
+    pthread_create(&client_thread, NULL, connect_to_pong, server);
+    clear_and_title();
+    int networked_menu_y = half.y + 5;
+    print_centered(networked_menu_y, "Waiting for connections...");
+    refresh();
+    // Avoid blocking input thread
+    nodelay(stdscr, true);
+    while (true) {
+        int v = getch();
+        if (v == 'q') return;
+        if (connected_client_mode()) {
+            run_client_mode(player, player_2, LEFT_PLAYER);
+        }
+        if (connected_server_mode()) {
+            run_server_mode(player, player_2, RIGHT_PLAYER);
+        }
+    }
+}
+
 void local_game(char* player_1) {
     clear_and_title();
-    char* player_2 = get_name("PLAYER 2 (RIGHT PADDLE)");
+    char* player_2 = get_name("PLAYER 2 (RIGHT PADDLE) ENTER YOUR NAME:");
     // left, right
-    run_local_game(player_1, player_2);
+    run_local_mode(player_1, player_2);
 }
 
 void options() {
@@ -166,6 +194,10 @@ void options() {
             case 'L':
                 leaderboard();
                 break;
+            case 'C':
+            case 'c':
+                networked_game(player);
+                break;
             case 'q':
             case 'Q':
                 safe_error_exit(0, "user quit game");
@@ -181,6 +213,6 @@ void menu_start() {
     flushinp();
     clear_and_title();
     // Get the players name
-    if (player == NULL) player = get_name("HELLO! WELCOME TO PONG!");
+    if (player == NULL) player = get_name("HELLO! WELCOME TO PONG! Enter Your Name:");
     options();
 }

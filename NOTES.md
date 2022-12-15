@@ -1,5 +1,7 @@
 ## TODO:
-- Add Networking
 - Comment
-- Add name to players to show who is who
+
+## ISSUES
+- Create state to int conversions
+- Test
 

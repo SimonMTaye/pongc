@@ -1,9 +1,9 @@
 CC = clang
-CFLAGS = -g -lpthread -lncurses -lm 
-CFLAGS_STRICT = -g -lpthread -lncurses -lm -Werror -Wall 
+LINK_FLAGS = -lpthread -lncurses -lm
+ERROR_FLAGS = -Werror -Wall
 
-pong: game.c main.c game.h constants.h fileman.o
-	$(CC) main.c game.c fileman.o  -o pong $(CFLAGS) 
+pong: main.c game.c game.h networked.h networked.c constants.h fileman.o
+	$(CC) main.c game.c networked.c message.c fileman.o  -o pong  $(LINK_FLAGS) 
 
 fileman.o: fileman.c fileman.h
 	$(CC) fileman.c  -c 

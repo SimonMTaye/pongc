@@ -5,6 +5,10 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 
 /**
  * Create a new socket and connect to a server.
@@ -72,8 +76,8 @@ static int server_socket_open(unsigned short* port) {
   // Set up the server socket to listen
   struct sockaddr_in addr = {
       .sin_family = AF_INET,          // This is an internet socket
-      .sin_addr.s_addr = INADDR_ANY,  // Listen for connections from any client
-      .sin_port = htons(*port)        // Use the specified port (may be zero)
+      .sin_port = htons(*port),        // Use the specified port (may be zero)
+      .sin_addr.s_addr = INADDR_ANY  // Listen for connections from any client
   };
 
   // Bind the server socket to the address. Return if there is an error.

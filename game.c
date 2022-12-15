@@ -1,16 +1,19 @@
 #include "game.h"
 #include "constants.h"
 #include <curses.h>
-#include <unistd.h>
 
 void draw_area(int starty, int startx, int endy, int endx, chtype ch);
 void draw_area_debug(int starty, int startx, int endy, int endx, chtype ch);
 void reset_game();
 void debug(char* message, int offset);
+void draw_all();
+// Compress game state variables into an int64_t
+uint32_t state_to_int32();
+// Take a compressed int64_t game state and set global variables
+void set_game_state(uint32_t state);
+
 // Scaled and Offset aware area draws
-//#define draw_area_offset(starty, startx, endy, endx, ch) draw_area(starty + NS_OFFSET.y, startx + NS_OFFSET.x, endy + NS_OFFSET.y, endx + NS_OFFSET.x, ch)
-//#define draw_area_scaled(starty, startx, endy, endx, ch) draw_area(starty * GAME_SCALE, startx * GAME_SCALE, endy* GAME_SCALE, endx * GAME_SCALE, ch)
-#define draw_area_scaled_offset(starty, startx, endy, endx, ch) draw_area_debug(((starty) * GAME_SCALE) + NS_OFFSET.y, ((startx) * GAME_SCALE) + NS_OFFSET.x, ((endy) * GAME_SCALE) + NS_OFFSET.y, ((endx) * GAME_SCALE) + NS_OFFSET.x, ch);
+#define draw_area_scaled_offset(starty, startx, endy, endx, ch) draw_area(((starty) * GAME_SCALE) + NS_OFFSET.y, ((startx) * GAME_SCALE) + NS_OFFSET.x, ((endy) * GAME_SCALE) + NS_OFFSET.y, ((endx) * GAME_SCALE) + NS_OFFSET.x, ch);
 
 //  Erase Macros
 #define erase_area(starty, startx, endy, endx) draw_area_scaled_offset(starty, startx, endy, endx, ' ')
@@ -22,7 +25,6 @@ void debug(char* message, int offset);
 #define draw_ball() draw_area_scaled_offset((ball_position.y), (ball_position.x), (ball_position.y + BALL_HEIGHT), (ball_position.x + BALL_LENGTH), BALL_CH)
 #define draw_right_paddle() draw_paddle((right_paddle.y), (right_paddle.x))
 #define draw_left_paddle() draw_paddle((left_paddle.y), (left_paddle.x))
-
 
 // Position Constants
 vector_t ball_speed;
@@ -48,6 +50,9 @@ int left_score = 0;
 // Name of the players for stat tracking
 char* left_player;
 char* right_player;
+
+// Ball movement control variable
+int ball_move_interval = BALL_INTERVAL;
 
 void init_curses() {
     if (CURSES_INIT) return;
@@ -110,6 +115,7 @@ void left_paddle_down(){
 }
 
 void debug(char * message, int offset) {
+    if (DEBUGGING_ENABLED != 1) return;
     int y = (LINES - ((NS_OFFSET.y / 2) +1)) + offset;
     draw_area(y, 0, y+1, COLS, ' ');
     move(y, (COLS / 2) - (X_DIMEN/2));
@@ -158,19 +164,18 @@ void move_ball() {
     }
         // Reflect ball y speed if it hits a wall
     if (ball_position.y == 0 || (ball_position.y == (Y_DIMEN - BALL_HEIGHT))) ball_speed.y = ball_speed.y * -1;
-
-    
-    
     // If the ball hits a wall on the left or right side, adjust the score and reset the game
     if (ball_position.x <= 0) {
         right_score += 1;
         reset_game();
+        draw_all();
         check_for_game_over();
         return;
     }
     if (ball_position.x >= (X_DIMEN  - BALL_LENGTH)) {
         left_score += 1;
         reset_game();
+        draw_all();
         check_for_game_over();
         return;
     }
@@ -183,10 +188,9 @@ void move_ball() {
 }
 
 void draw_area_debug(int starty, int startx, int endy, int endx, chtype ch) {
-    char* buff = malloc(sizeof(char) * 100);
+    char buff[100];
     sprintf(buff, "[DRAW AREA] Y: (%d, %d), X: (%d, %d)", starty, endy, startx, endx);
     debug(buff, 0);
-    free(buff);
     draw_area(starty, startx, endy, endx, ch);
 }
 
@@ -222,11 +226,13 @@ void print_score() {
     // Use low-level draw since score is off the game board
     draw_area(NS_OFFSET.y / 2, NS_OFFSET.x, (NS_OFFSET.y /2) + 1, NS_OFFSET.x + (X_DIMEN * GAME_SCALE), ' ');
     move(NS_OFFSET.y / 2, (COLS / 2) - 3);
+    attron(A_BOLD);
     printw("%d - %d", left_score, right_score);
+    attroff(A_BOLD);
 
 }
 
-void reset_positions() {
+void reset_positions_and_speed() {
     // Initialize ball constants
     ball_speed.y = 1;
     ball_speed.x = 1;
@@ -238,6 +244,7 @@ void reset_positions() {
     right_paddle.x = X_DIMEN - PADDLE_LENGTH ;
     left_paddle.y = Y_DIMEN / 2;
     left_paddle.x = 0;
+    ball_move_interval = BALL_INTERVAL;
 
 }
 
@@ -248,15 +255,18 @@ void reset_score() {
 }
 
 
-
-void reset_game() {
-    clear();
-    reset_positions();
+void draw_all() {
     draw_borders();
     draw_left_paddle();
     draw_right_paddle();
     draw_ball();
     print_score();
+}
+
+void reset_game() {
+    reset_positions_and_speed();
+    draw_all();
+    clear();
     char buff[100];
     sprintf(buff, "[CONSTANTS] (Y,X) NS_OFFSET: (%d, %d) GAME_SCALE: %d", NS_OFFSET.y, NS_OFFSET.x, GAME_SCALE);
     debug(buff, 2);
@@ -269,7 +279,7 @@ int getmilis() {
     return (t.tv_sec * 1000) + lround(t.tv_nsec / 1e06);
 }
 
-void run_local_game(char* left, char* right) {
+void init_new_game(char* left, char* right) {
     // Save player names
     left_player = left;
     right_player = right;
@@ -279,14 +289,152 @@ void run_local_game(char* left, char* right) {
     // Reset game
     reset_score();
     reset_game();
-    int last = getmilis();
-    int now; 
+    // Set RUN_GAME flag
     RUN_GAME = true;
-        while (RUN_GAME) {
+    draw_all();
+}
+
+uint32_t state_to_int32() {
+    // Add Score Data
+    uint32_t state = left_score;
+
+    state = state << 4;
+    state += right_score;
+
+    state = state << 4;
+    state += left_paddle.y;
+
+    state = state << 4;
+    state += right_paddle.y;
+
+    state = state << 12;
+    state += ball_position.x;
+
+    state = state << 4;
+    state += ball_position.y;
+
+    return state;
+}
+
+void set_game_state(uint32_t state) {
+    left_score = (state & (0xF << 28)) >> 28;
+    right_score = (state & (0xF << 24)) >> 24;
+    left_paddle.y = (state & (0xF << 20)) >> 20;
+    right_paddle.y = (state & (0xF << 16)) >> 16;
+    ball_position.x = (state & (0xFFF << 4)) >> 4;
+    ball_position.y = state & 0xF;
+}
+
+void* send_user_input(void* args) {
+    int player = *((int*) args);
+    while (RUN_GAME) {
+        int v = getch();
+        if (v == 'q') {
+            send_key_stroke(v);
+            // TODO Add quit routine
+            return NULL;
+        }
+        if (player == RIGHT_PLAYER && (v == RIGHT_PADDLE_UP || v == RIGHT_PADDLE_DOWN))
+            send_key_stroke(v);
+        if (player == LEFT_PLAYER && (v == LEFT_PADDLE_UP || v == LEFT_PADDLE_DOWN))
+            send_key_stroke(v);
+    }
+    return NULL;
+}
+
+void* receive_user_input() {
+    while (RUN_GAME) {
+        int v = get_key_stroke();
+        ungetch(v);
+    }
+    return NULL;
+}
+
+void send_state() {
+    uint32_t state = state_to_int32();
+    send_game_state(state);
+}
+
+void run_server_mode(char* left, char* right, int player) {
+    if (player != RIGHT_PLAYER && player != LEFT_PLAYER) {
+        safe_error_exit(1, "[CLIENT-MODE] Unexpected player value");
+    }
+    pthread_t input_listener_thread;
+    pthread_create(&input_listener_thread, NULL, receive_user_input, NULL);
+    init_new_game(left, right);
+    int last_move = getmilis();
+    int last_inc = getmilis();
+    int now; 
+    while (RUN_GAME) {
         now = getmilis(); 
-        if ((now - last) > BALL_MOVE_INTERVAL) {
-            last = now;
+        if ((now - last_move) > ball_move_interval) {
+            last_move = now;
             move_ball();
+            send_state();
+        }
+        if ((now - last_inc) > BALL_INTERVAL) {
+            last_inc = now;
+            ball_move_interval -= 10;
+            send_state();
+        }
+        int v = getch();
+        switch (v) {
+            case LEFT_PADDLE_UP:
+                left_paddle_up();
+                send_state();
+                break;
+            case LEFT_PADDLE_DOWN:
+                left_paddle_down();
+                send_state();
+                break;
+            case RIGHT_PADDLE_UP:
+                right_paddle_up();
+                send_state();
+                break;
+            case RIGHT_PADDLE_DOWN:
+                right_paddle_down();
+                send_state();
+                break;
+            case 'q':
+                return;
+        }
+        usleep(SLEEP_INTERVAL);
+    }
+}
+
+void run_client_mode(char* left, char* right, int player) {
+    if (player != RIGHT_PLAYER && player != LEFT_PLAYER) {
+        safe_error_exit(1, "[CLIENT-MODE] Unexpected player value");
+    }
+    init_new_game(left, right);
+    draw_all();
+    pthread_t input_listener_thread;
+    pthread_create(&input_listener_thread, NULL, send_user_input, &player);
+    while (RUN_GAME) {
+        int64_t new_state = get_new_game_state();
+        set_game_state(new_state);
+        clear();
+        draw_all();
+    }
+    // Guard to prevent param from being an incorrect memory use
+    pthread_join(input_listener_thread, NULL);
+}
+
+void run_local_mode(char* left, char* right) {
+    init_new_game(left, right);   
+    int last_move = getmilis();
+    int last_inc = getmilis();
+    int now; 
+    while (RUN_GAME) {
+        now = getmilis(); 
+        if ((now - last_move) > ball_move_interval) {
+            last_move = now;
+            move_ball();
+        }
+        // Decrement speed every BALL_INTERVAL ms
+        if ((now - last_inc) > BALL_INTERVAL) {
+            last_inc = now;
+            ball_move_interval -= 10;
         }
         int v = getch();
         switch (v) {
@@ -309,5 +457,3 @@ void run_local_game(char* left, char* right) {
     }
     endwin();
 }
-
-
