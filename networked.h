@@ -1,12 +1,10 @@
-#include "message.h"
-#include "types.h"
 #include <stdbool.h>
+#include <stdint.h>
 
-#define PONG_PORT 11384
 
 // Must return names eventually
-void* connect_to_pong(void* args);
-void* listen_for_connections();
+bool connect_to_pong(char* server);
+bool listen_for_connections(int timeout_s);
 
 // Transmit keystrokes from ncurses to connection
 // Args should be a char

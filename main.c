@@ -2,25 +2,30 @@
 #include "game.h"
 #include <curses.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define LEADERBOARD_ENTRIES 5
 
 int MENU_SCALE = 1;
+int MENU_Y_START;
 
 vector_t half;
-char* player = NULL;
+char *player = NULL;
 
 void menu_start();
 void leaderboard();
-char* get_name(char* message);
+char *get_input(char *message, char* wanted);
 
-int main(void) {
+int main(void)
+{
     menu_start();
 }
 
-void init_menu_constants() {
+void init_menu_constants()
+{
     // Set the character processing to be non-blocking
     nodelay(stdscr, false);
     // Hide cursor
@@ -31,16 +36,19 @@ void init_menu_constants() {
     // Init Half Width and Length to avoid recomputation
     half.x = COLS / 2;
     half.y = LINES / 2;
+    MENU_Y_START = half.y - 3;
 }
 
 // Utility functions
-void print_centered(int y, char* message) {
+void print_centered(int y, char *message)
+{
     int length = strlen(message);
     move(y, half.x - (length / 2));
     printw("%s", message);
 }
 
-void clear_and_title() {
+void clear_and_title()
+{
     clear();
     flushinp();
     attron(A_BOLD);
@@ -48,52 +56,65 @@ void clear_and_title() {
     attroff(A_BOLD);
 }
 
-char* get_name(char* message) {
+char *get_input(char *message, char* wanted)
+{
     clear_and_title();
     int menu_items_start = half.y;
-    print_centered(menu_items_start, message);
+    if (message != NULL) 
+        print_centered(menu_items_start, message);
+    int l = strlen(wanted);
+    char buff[l + 20];
+    sprintf(buff, "Enter %s:", wanted);
+    print_centered(menu_items_start + 2, buff);
+
     move(menu_items_start + 3, half.x - 4);
     int v = 0;
     int counter = 0;
     int size = 50;
-    char* name = malloc(sizeof(char) * size);
+    char *name = malloc(sizeof(char) * size);
     curs_set(2);
-    while (v != '\n') {
+    while (v != '\n')
+    {
         v = getch();
-        if (v == ERR) {
+        if (v == ERR)
+        {
             safe_error_exit(1, "Error reading char from keyboard");
         }
-        if (v == KEY_BACKSPACE || v == '\b' || v == 127) {
-            counter --;
+        if (v == KEY_BACKSPACE || v == '\b' || v == 127)
+        {
+            counter--;
             counter = max(0, counter);
-            mvaddch(menu_items_start+3, half.x - 4 + counter, ' ');
-            move(menu_items_start+3, half.x-4 + counter);
+            mvaddch(menu_items_start + 3, half.x - 4 + counter, ' ');
+            move(menu_items_start + 3, half.x - 4 + counter);
             refresh();
-            name[counter]  = '\0';
+            name[counter] = '\0';
             continue;
         }
-        if (((char) v <= 'z') && ((char) v >= 'A')) {
+        if (((char)v <= 'z') && ((char)v >= 'A'))
+        {
             addch(v);
-            if (counter == size) {
+            if (counter == size)
+            {
                 size *= 2;
                 name = realloc(name, sizeof(char) * size);
             }
 
-            name[counter] = (char) v;
-            counter ++;
+            name[counter] = (char)v;
+            counter++;
         }
     }
     // Add space for a null terminator
-    if (counter == size) {
-        name = realloc(name,  sizeof(char) * (size + 1));
+    if (counter == size)
+    {
+        name = realloc(name, sizeof(char) * (size + 1));
     }
     name[counter] = '\0';
     curs_set(0);
     return name;
 }
 
-
-void print_ip() {
+void print_ip()
+{
     clear();
     print_centered(half.y - 7, "PONG!");
     move(half.y + 1, half.x - 8);
@@ -101,17 +122,18 @@ void print_ip() {
     printw("IP: %s", ip);
 }
 
-
-void leaderboard() {
+void leaderboard()
+{
     clear_and_title();
     print_centered(half.y - 5, "(B)ack");
-    pong_file_t* file_ds = read_file();
+    pong_file_t *file_ds = read_file();
     int entries_to_show = (LEADERBOARD_ENTRIES > file_ds->num_entries) ? file_ds->num_entries : LEADERBOARD_ENTRIES;
     // DISPLAY TOTAL WINS COLUMN
     sort_win_count(file_ds);
     move(half.y - 2, half.x - 30);
     printw("Total Wins");
-    for (int i = 0; i < entries_to_show; i++) {
+    for (int i = 0; i < entries_to_show; i++)
+    {
         move(half.y + i, half.x - 30);
         pong_file_entry_t entry = file_ds->entries[i];
         printw("%d: %s (%d win(s))", i + 1, entry.name, entry.won);
@@ -120,99 +142,125 @@ void leaderboard() {
     sort_win_percentage(file_ds);
     move(half.y - 2, half.x + 20);
     printw("Win Percentage");
-    for (int i = 0; i < entries_to_show; i++) {
+    for (int i = 0; i < entries_to_show; i++)
+    {
         move(half.y + i, half.x + 20);
         pong_file_entry_t entry = file_ds->entries[i];
-        printw("%d: %s (%.2f%)", i+ 1, entry.name, (entry.win_percentage * 100));
+        printw("%d: %s (%.2f%%)", i + 1, entry.name, (entry.win_percentage * 100));
     }
     refresh();
     int v;
-    while(true) {
+    while (true)
+    {
         v = getch();
-        switch (v) {
-            case 'b':
-            case 'B':
-                return; 
-            case 'q':
-            case 'Q':
-                safe_error_exit(0, "user quit game");
+        switch (v)
+        {
+        case 'b':
+        case 'B':
+            return;
+        case 'q':
+        case 'Q':
+            safe_error_exit(0, "user quit game");
         }
     }
 }
 
-void networked_game(char* player) {
-    clear_and_title();
+void server_mode(char* player) {
     char* player_2 = strdup("Test");
-    char * server = get_name("Enter a server you want to connect to:");
-    pthread_t server_thread, client_thread;
-    pthread_create(&server_thread, NULL, listen_for_connections, NULL);
-    pthread_create(&client_thread, NULL, connect_to_pong, server);
     clear_and_title();
-    int networked_menu_y = half.y + 5;
-    print_centered(networked_menu_y, "Waiting for connections...");
+    print_centered(MENU_Y_START, "Waiting for connections...");
     refresh();
-    // Avoid blocking input thread
-    nodelay(stdscr, true);
-    while (true) {
-        int v = getch();
-        if (v == 'q') return;
-        if (connected_client_mode()) {
-            run_client_mode(player, player_2, LEFT_PLAYER);
-        }
-        if (connected_server_mode()) {
-            run_server_mode(player, player_2, RIGHT_PLAYER);
-        }
+    bool success = listen_for_connections(5);
+    if (success) { 
+        run_server_mode(player, player_2, LEFT_PLAYER);
+        return;
     }
+    clear_and_title();
+    print_centered(MENU_Y_START, "Connection Failed");
+    refresh();
+    sleep(3);
+    return;
 }
 
-void local_game(char* player_1) {
+void client_mode(char* player) {
+    char* player_2 = strdup("Test");
+    char* server = get_input("Connect to Server", "Server Name");
     clear_and_title();
-    char* player_2 = get_name("PLAYER 2 (RIGHT PADDLE) ENTER YOUR NAME:");
-    // left, right
+    print_centered(MENU_Y_START, "Trying to connect...");
+    refresh();
+    bool success; 
+    int counter = 0;
+    while (!success && counter < 10) {
+        success = connect_to_pong(server);
+        counter += 1;
+        sleep(1);
+    }
+    if (success) {
+        run_client_mode(player, player_2, RIGHT_PLAYER);
+        return;
+    }
+    clear_and_title();
+    print_centered(MENU_Y_START, "Connection Failed");
+    refresh();
+    sleep(3);
+}
+
+void local_game(char *player_1)
+{
+    char *player_2 = get_input("PLAYER 2 (RIGHT PADDLE)", "Your Name");
     run_local_mode(player_1, player_2);
 }
 
-void options() {
-    while (true) {
+void options()
+{
+    while (true)
+    {
         init_menu_constants();
         clear_and_title();
-        int menu_items_start = half.y - 3;
-        print_centered(menu_items_start,   "(P)lay Localy");
-        print_centered(menu_items_start+1, "(C)onnect and Play");
-        print_centered(menu_items_start+2, "(L)eaderboard");
-        print_centered(menu_items_start+3, "(Q)uit");
+        print_centered(MENU_Y_START, "(P)lay Localy");
+        print_centered(MENU_Y_START + 1, "(C)lient Mode");
+        print_centered(MENU_Y_START + 2, "(S)erver Mode");
+        print_centered(MENU_Y_START + 3, "(L)eaderboard");
+        print_centered(MENU_Y_START + 4, "(Q)uit");
         flushinp();
         refresh();
         int v;
         v = getch();
-        switch (v) {
-            case 'p':
-            case 'P':
-                local_game(player);
-                break;
-            case 'l':
-            case 'L':
-                leaderboard();
-                break;
-            case 'C':
-            case 'c':
-                networked_game(player);
-                break;
-            case 'q':
-            case 'Q':
-                safe_error_exit(0, "user quit game");
-                return;
+        switch (v)
+        {
+        case 'p':
+        case 'P':
+            local_game(player);
+            break;
+        case 'l':
+        case 'L':
+            leaderboard();
+            break;
+        case 'C':
+        case 'c':
+            client_mode(player);
+            break;
+        case 'S':
+        case 's':
+            server_mode(player);
+            break;
+        case 'q':
+        case 'Q':
+            safe_error_exit(0, "user quit game");
+            return;
         }
         flushinp();
     }
 }
 
-void menu_start() {
+void menu_start()
+{
     init_curses();
     init_menu_constants();
     flushinp();
     clear_and_title();
     // Get the players name
-    if (player == NULL) player = get_name("HELLO! WELCOME TO PONG! Enter Your Name:");
+    if (player == NULL)
+        player = get_input("HELLO! WELCOME TO PONG!",  "Your Name");
     options();
 }
