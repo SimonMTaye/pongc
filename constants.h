@@ -16,7 +16,7 @@
 #define BORDER_CH               ACS_BULLET      // Character used to draw walls and the background
 
 #define SCORE_LINE_LENGTH       X_DIMEN         // Width of score board
-#define SLEEP_INTERVAL          20              // Sleep interval (ms) between checking for user input. (Reverse FPS)
+#define SLEEP_INTERVAL          5              // Sleep interval (ms) between checking for user input. (Reverse FPS)
 #define BALL_INTERVAL           600             // How to long to wait before moving the ball (ms)
 
 // Keys used for controlling the paddles

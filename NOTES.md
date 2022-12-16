@@ -1,7 +1,3 @@
-## TODO:
-- Comment
-
 ## ISSUES
-- Create state to int conversions
-- Test
+- Fix client sending error
 

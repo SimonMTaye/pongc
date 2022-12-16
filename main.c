@@ -8,7 +8,6 @@
 #include <unistd.h>
 
 #define LEADERBOARD_ENTRIES 5
-
 int MENU_SCALE = 1;
 int MENU_Y_START;
 
