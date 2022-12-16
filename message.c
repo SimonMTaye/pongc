@@ -19,7 +19,7 @@ int send_message(int fd, char* message) {
   size_t len = strlen(message);
   if (write(fd, &len, sizeof(size_t)) != sizeof(size_t)) {
     // Writing failed, so return an error
-    return -1;
+    return -2;
   }
 
   // Now we can send the message. Loop until the entire message has been written.
@@ -29,7 +29,7 @@ int send_message(int fd, char* message) {
     ssize_t rc = write(fd, message + bytes_written, len - bytes_written);
 
     // Did the write fail? If so, return an error
-    if (rc <= 0) return -1;
+    if (rc <= 0) return -3;
 
     // If there was no error, write returned the number of bytes written
     bytes_written += rc;

@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
-
 /// @brief Reset all positions and speeds to initial values and redraw screen
 void reset_game();
 /// @brief Set scores to 0
@@ -36,6 +35,8 @@ void process_user_input(int v, int player);
 /// @brief Move the ball to new coordinates as determined by its speed and poisiton. In case it collides with paddles or walls, reflect x or y speeds respectively.
 ///         Increment score if collides with the left or right walls (i.e. the goals)
 void move_ball();
+/// @brief Check if a player has a score over the threshold. If so, track the win in the stat file and show game over screen.
+void check_for_game_over();
 /// @brief Get time in miliseconds
 int getmilis();
 
@@ -219,7 +220,6 @@ void run_server_mode(char *left, char *right, int player)
         process_user_input(v, player);
         v = get_next_int();
         process_user_input(v, BOTH);
-        usleep(SLEEP_INTERVAL);
     }
 }
 
@@ -233,30 +233,30 @@ void run_client_mode(char *left, char *right, int player)
     draw_all();
     while (RUN_GAME)
     {
-        int v = getch();
         uint32_t new_state = get_new_game_state();
-        set_game_state(new_state);
-        clear();
-        draw_all();
-        refresh();
+        if ((int) (new_state) != -1 && state_to_int32() != new_state) {
+            set_game_state(new_state);
+            check_for_game_over();
+            clear();
+            draw_all();
+        }
+        int v = getch();
         switch (v)
         {
         case LEFT_PADDLE_UP:
         case LEFT_PADDLE_DOWN:
-            if (player != LEFT_PLAYER)
-                v = -1;
+            if (player == LEFT_PLAYER)
+                send_int32(v);
             break;
         case RIGHT_PADDLE_UP:
         case RIGHT_PADDLE_DOWN:
-            if (player != RIGHT_PLAYER)
-                v = -1;
+            if (player == RIGHT_PLAYER)
+                send_int32(v);
             break;
         case 'q':
             send_int32(v);
             return;
         }
-        send_int32(v);
-        usleep(SLEEP_INTERVAL);
     }
 }
 /// @brief Show a brief congratulations message to the winner and return

@@ -10,25 +10,29 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 
-unsigned short PONG_PORT = 11384;
-
-int SERVER_SOCKET_FD = -1;
+unsigned short PONG_PORT = 11384; int SERVER_SOCKET_FD = -1;
 int PONG_SOCKET_FD = -1;
 
 int buff[10];
 int size = 0;
 
-bool input_thread = false;
+#define INPUT_BUF_SIZE 3
+
 
 typedef struct buffer
 {
-    int buff[10];
+    int buff[INPUT_BUF_SIZE];
     int first;
     int last;
     int size;
 } input_buf_t;
 
+bool input_thread = false;
 input_buf_t *KEYSTROKE_BUFFER = NULL;
+int32_t KEY_BUFFER = -1;
+
+bool game_state_thread = false;
+uint32_t GAME_STATE_BUFFER = -1;
 
 /// @brief Return the first item in the buffer. -1 is returned if its empty
 /// @param buf the buffer
@@ -41,7 +45,7 @@ int get_next(input_buf_t *buf)
     int c = buf->buff[buf->first];
     if (buf->first == 0)
     {
-        buf->first = 9;
+        buf->first = INPUT_BUF_SIZE - 1;
     }
     else
     {
@@ -58,10 +62,10 @@ int queue(input_buf_t *buf, int v)
     if (size == 10)
     {
         // Delete the last key
-        buf->first = (buf->first + 1) % 10;
+        buf->first = (buf->first + 1) % INPUT_BUF_SIZE;
         buf->size--;
     }
-    buf->last = (buf->last + 1) % 10;
+    buf->last = (buf->last + 1) % INPUT_BUF_SIZE;
     buf->buff[buf->last] = v;
     buf->size++;
     return buf->last;
@@ -84,8 +88,8 @@ void *message_listner()
         if (mssg != NULL)
         {
             queue(KEYSTROKE_BUFFER, atoi(mssg));
+            
         }
-        usleep(3);
     }
     return NULL;
 }
@@ -102,10 +106,29 @@ int get_next_int()
     return get_next(KEYSTROKE_BUFFER);
 }
 
+void* state_listenter() {
+    while (PONG_SOCKET_FD != -1)
+    {
+        char *mssg = receive_message(PONG_SOCKET_FD);
+        if (mssg != NULL)
+        {
+            GAME_STATE_BUFFER = atoi(mssg);
+            
+        }
+    }
+    return NULL;
+
+}
+
 uint32_t get_new_game_state()
 {
-    char *mssg = receive_message(PONG_SOCKET_FD);
-    return atoll(mssg);
+    if (!game_state_thread)
+    {
+        game_state_thread = true;
+        pthread_t listener;
+        pthread_create(&listener, NULL, state_listenter, NULL);
+    }
+    return GAME_STATE_BUFFER;
 }
 
 /// @brief Open a server socket on PONG_PORT and wait for incoming connections. Set PONG_SOCKET_FD on succesfull connection
